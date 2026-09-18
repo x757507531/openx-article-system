@@ -1,0 +1,413 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "human-writing-AYI 拆解",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "layers",
+        "label": "分层与加载时机",
+        "focus": [
+          "inject",
+          "formats",
+          "evidence",
+          "revision"
+        ],
+        "note": "常驻的只有 frontmatter；三份 reference 各在不同时机才读进来。"
+      },
+      {
+        "id": "gates",
+        "label": "四道强制闸门",
+        "focus": [
+          "material",
+          "research",
+          "profile",
+          "check",
+          "rewrite",
+          "log"
+        ],
+        "note": "材料关、定档案、硬违规清零、回写日志，四处都不由模型自行跳过。"
+      },
+      {
+        "id": "memory",
+        "label": "跨篇记忆闭环",
+        "focus": [
+          "log",
+          "pick",
+          "profile",
+          "draft"
+        ],
+        "note": "日志喂给下一篇的抽签，动作选择权不在模型手里。"
+      }
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "模型执行"
+        },
+        "backend": {
+          "label": "决策脚本"
+        },
+        "security": {
+          "label": "强制闸门"
+        },
+        "database": {
+          "label": "文件与状态"
+        },
+        "external": {
+          "label": "流程边界"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "knowledge",
+      "label": "知识层 references/ · 按需读取"
+    },
+    {
+      "id": "flow",
+      "label": "主流程 · SKILL.md 全文常驻"
+    },
+    {
+      "id": "decision",
+      "label": "决策·校验·状态 · scripts/ 外部执行"
+    },
+    {
+      "id": "blocked",
+      "label": "闸门不通过",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "route",
+      "label": "触发与注入",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "gate",
+      "label": "两道前置闸门",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "produce",
+      "label": "写作·校验·记忆",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "groups": [
+    {
+      "id": "forced_tail",
+      "label": "交付前不可跳过",
+      "lane": "decision",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "emphasis"
+    }
+  ],
+  "mainPath": [
+    "trigger",
+    "inject",
+    "material",
+    "profile",
+    "draft",
+    "check",
+    "log",
+    "deliver"
+  ],
+  "nodes": [
+    {
+      "id": "formats",
+      "lane": "knowledge",
+      "col": 1,
+      "type": "database",
+      "label": "文体模板层",
+      "sublabel": "formats-ayi.md",
+      "width": 148
+    },
+    {
+      "id": "revision",
+      "lane": "knowledge",
+      "col": 4,
+      "type": "database",
+      "label": "审稿检查层",
+      "sublabel": "revision-ayi.md",
+      "width": 148
+    },
+    {
+      "id": "evidence",
+      "lane": "knowledge",
+      "col": 5,
+      "type": "database",
+      "label": "语料证据层",
+      "sublabel": "style-evidence.md",
+      "width": 148
+    },
+    {
+      "id": "trigger",
+      "lane": "flow",
+      "col": 0,
+      "type": "external",
+      "label": "触发路由",
+      "sublabel": "description 是路由依据",
+      "width": 148
+    },
+    {
+      "id": "inject",
+      "lane": "flow",
+      "col": 1,
+      "type": "frontend",
+      "label": "注入提示词",
+      "sublabel": "SKILL.md 全文常驻",
+      "width": 148
+    },
+    {
+      "id": "material",
+      "lane": "flow",
+      "col": 2,
+      "type": "security",
+      "label": "材料关",
+      "sublabel": "数字锚点 + 自撞细节",
+      "tag": "强制",
+      "width": 148
+    },
+    {
+      "id": "profile",
+      "lane": "flow",
+      "col": 3,
+      "type": "security",
+      "label": "定稿件档案",
+      "sublabel": "照单执行，不自选",
+      "tag": "强制",
+      "width": 148
+    },
+    {
+      "id": "draft",
+      "lane": "flow",
+      "col": 4,
+      "type": "frontend",
+      "label": "写初稿",
+      "sublabel": "3–5 个动作，一种体例",
+      "width": 148
+    },
+    {
+      "id": "deliver",
+      "lane": "flow",
+      "col": 5,
+      "type": "external",
+      "label": "交稿",
+      "sublabel": "只交作品，附免责",
+      "width": 148
+    },
+    {
+      "id": "pick",
+      "lane": "decision",
+      "col": 3,
+      "type": "backend",
+      "label": "抽本篇档案",
+      "sublabel": "pick_profile.py",
+      "width": 148
+    },
+    {
+      "id": "check",
+      "lane": "decision",
+      "col": 4,
+      "type": "security",
+      "label": "机械检查",
+      "sublabel": "check_ayi.py",
+      "tag": "exit 1",
+      "width": 148
+    },
+    {
+      "id": "log",
+      "lane": "decision",
+      "col": 5,
+      "type": "database",
+      "label": "跨篇日志",
+      "sublabel": "series-log.jsonl",
+      "tag": "放产出目录",
+      "width": 148
+    },
+    {
+      "id": "research",
+      "lane": "blocked",
+      "col": 2,
+      "type": "security",
+      "label": "补材料",
+      "sublabel": "研究 / 最多三问 / 缩篇",
+      "width": 148
+    },
+    {
+      "id": "rewrite",
+      "lane": "blocked",
+      "col": 4,
+      "type": "security",
+      "label": "回改",
+      "sublabel": "硬违规必须清零",
+      "width": 148
+    }
+  ],
+  "edges": [
+    {
+      "from": "trigger",
+      "to": "inject",
+      "label": "路由命中",
+      "role": "main"
+    },
+    {
+      "from": "inject",
+      "to": "material",
+      "role": "main"
+    },
+    {
+      "from": "material",
+      "to": "profile",
+      "label": "材料齐备",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "from": "profile",
+      "to": "draft",
+      "label": "照档案写",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "from": "draft",
+      "to": "check",
+      "label": "落盘后跑",
+      "role": "main"
+    },
+    {
+      "from": "check",
+      "to": "log",
+      "label": "exit 0",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "from": "log",
+      "to": "deliver",
+      "role": "main"
+    },
+    {
+      "from": "pick",
+      "to": "profile",
+      "label": "输出档案",
+      "variant": "emphasis"
+    },
+    {
+      "from": "log",
+      "to": "pick",
+      "label": "喂下一篇",
+      "role": "return",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          1106,
+          570
+        ],
+        [
+          597,
+          570
+        ],
+        [
+          597,
+          379
+        ]
+      ],
+      "labelDx": -140
+    },
+    {
+      "from": "material",
+      "to": "research",
+      "label": "材料不足",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "research",
+      "to": "material",
+      "label": "补齐重入",
+      "role": "return",
+      "variant": "dashed"
+    },
+    {
+      "from": "check",
+      "to": "rewrite",
+      "label": "exit 1",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "from": "rewrite",
+      "to": "check",
+      "label": "清零复跑",
+      "role": "return",
+      "variant": "dashed"
+    },
+    {
+      "from": "inject",
+      "to": "formats",
+      "label": "判文体",
+      "role": "branch"
+    },
+    {
+      "from": "draft",
+      "to": "revision",
+      "label": "初稿后才读",
+      "role": "branch"
+    },
+    {
+      "from": "draft",
+      "to": "evidence",
+      "label": "取语料原句",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "四道强制闸门",
+      "items": [
+        "材料关：缺数字锚点不许动笔",
+        "定档案：动作由脚本指定，模型不自选",
+        "机械检查：exit 1 不清零不许交付",
+        "回写日志：少这行下一篇就没记忆"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "分层为的是省上下文",
+      "items": [
+        "常驻的只有 frontmatter 两个字段",
+        "SKILL.md 触发时全文注入并常驻",
+        "三份 reference 读到才付成本",
+        "脚本只回结果，本体不进上下文"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "同质化才是它要修的病",
+      "items": [
+        "模型自选动作会稳定收敛成套路",
+        "纯 LRU 轮换会切出固定周期",
+        "整组撞上最近五篇就换种子重抽",
+        "种子取自标题，档案可复现",
+        "材料真假与比方土不土，只能人读"
+      ]
+    }
+  ]
+}

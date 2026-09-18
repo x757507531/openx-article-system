@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.DS_Store
+.obsidian/workspace*
+.obsidian/cache
+*.bak
+# 产出物不入库（这是系统仓库，不是内容仓库）
+06-工作区/**
+!06-工作区/README.md
+!06-工作区/*/
+!06-工作区/*/.gitkeep
+03-文章/**
+!03-文章/*/
+!03-文章/*/.gitkeep
+02-主题簇/*
+!02-主题簇/.gitkeep
+01-索引/series-log.jsonl
