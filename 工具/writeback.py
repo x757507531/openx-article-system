@@ -312,6 +312,26 @@ def main():
     aid, lang, path, fm, body = locate(arts, args.article, args.lang)
     by_id_lang = {(a[0], a[1]): a for a in arts}
 
+    # 验证目标状态，而非只验证本次参数；未发布交付可保持 ready。
+    from openx_ops import valid_url
+    effective_status = args.status if args.status is not None else fm_get(fm, "status")
+    effective_url = args.url if args.url is not None else fm_get(fm, "url")
+    effective_date = args.publish_date if args.publish_date is not None else fm_get(fm, "publish_date")
+    effective_status, effective_url, effective_date = (
+        (value or "").strip().strip("'\"")
+        for value in (effective_status, effective_url, effective_date))
+    if args.url is not None and args.url and not valid_url(args.url):
+        die("--url 必须是真实 HTTPS 地址，不能含凭据、换行或占位域名。")
+    if effective_status == "published" and (not valid_url(effective_url) or not effective_date):
+        die("published 必须同时有有效 HTTPS URL 与发布日期；未上线请保持 ready。")
+    if effective_date:
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", effective_date):
+                raise ValueError()
+            datetime.date.fromisoformat(effective_date)
+        except ValueError:
+            die("publish_date 必须是有效的 YYYY-MM-DD 日期。")
+
     edits, manual = [], []
 
     # ---- 1. 本文 frontmatter ----
@@ -368,7 +388,7 @@ def main():
             t_new, _ = fm_set_list(list(t_fm), "inbound_links", merged)
             t_new, _ = fm_set_scalar(t_new, "updated", today)
             edits.append(Edit(t_path, read(t_path),
-                              "---\n" + "\n".join(t_new) + "\n---" + t_body,
+                              "---\n" + "\n".join(t_new) + "\n---\n" + t_body,
                               ["inbound_links: %s → %s" % (cur_in or "[]", merged)]))
 
     # ---- 3. 文章总表 ----
@@ -394,7 +414,7 @@ def main():
         lines, st = upsert_row(lines, tb, ["article_id", "lang"], [aid, lang],
                                {"slug": fm_get(fm, "slug") or "—",
                                 "url": args.url,
-                                "publish_date": args.publish_date or "—"})
+                                "publish_date": effective_date or "—"})
         t_notes.append("URL 登记 → %s（%s）" % (args.url, st))
 
     if t_notes:

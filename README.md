@@ -1,7 +1,7 @@
 ---
 type: readme
 name: OpenX 文章系统 README
-updated: 2026-09-18
+updated: 2026-09-22
 ---
 
 # OpenX 文章系统 README
@@ -153,7 +153,9 @@ python3 "工具/openx_audit.py" scan
 ```bash
 git clone https://github.com/x757507531/openx-article-system.git
 cd openx-article-system
-./install.sh            # 复制 skills/ 下四个 skill 到 ~/.claude/skills（已存在的不覆盖，--force 才覆盖），并把本仓库路径写进 CLAUDE.md / AGENTS.md / skill 引用处
+./install.sh            # 安装技能与 gate.py 依赖，已有目录跳过
+./install.sh --force    # 先备份已有安装，再更新
+./install.sh --agents   # 可选：为两个 SEO skill 建立 ~/.agents/skills 共享入口
 ```
 
 安装后三件事：
@@ -172,3 +174,20 @@ cd openx-article-system
 2. **只登记表格不建文件**。脚本读的是 frontmatter，表格里的文章对系统不存在。
 3. **全绿不等于正确**。三层审核缺一层，稿子就会带着结构完美的错误上线。
 4. **改了规则不 grep 旧措辞**。案例规则一换，散在各节的旧口径句子会留下来。
+
+
+## 七、版本与维护
+
+当前版本：**0.3.0-beta**。每次规则、脚本或安装行为更新，都在 [版本更新日志](版本更新日志.md) 记录变更与验证结果；操作说明见 [系统维护](工具/系统维护.md)。
+
+安装器只替换安装副本中的路径，保留仓库占位符。可用 `--skills-dir` 指定技能目录、`--agents-dir` 指定共享入口目录；共享入口有冲突时需 `--force` 备份后替换。备份位置由安装器输出。两个 SEO 脚本以相邻技能目录定位依赖，Vault 可通过 `OPENX_VAULT` 指定，也可从文章路径自动识别。
+
+```bash
+python3 "工具/openx_ops.py" inventory
+python3 "工具/openx_ops.py" links
+python3 "工具/openx_ops.py" export --article OX-0001 --lang zh-Hant --output "06-工作区/导出/发布稿.md"
+python3 "工具/openx_ops.py" feedback --output "06-工作区/文章效果记录.csv"
+python3 -m unittest discover -s 工具/tests -v
+```
+
+导出目录需预先创建，已有输出文件不会被覆盖。导出不会发布到网站；正式发布回写必须提供真实 HTTPS URL 和有效日期。效果表生成空白指标，需填入实际观测数据。

@@ -9,4 +9,4 @@
 | `human-writing-AYI` | 正文写作文风与稿件档案轮换（`pick_profile.py` / `check_ayi.py`），通用 skill，不含站点信息 |
 | `seo-writing-orange/scripts/gate.py` | 闸 1.5 信息增益与大纲检查所依赖的脚本（仅收录该脚本） |
 
-skill 之间的引用一律走 `~/.claude/skills/<name>/…`，所以必须安装到那个位置。
+默认安装到 `~/.claude/skills/`，可用 `--skills-dir` 指定目录。两个 SEO 脚本以相邻目录定位依赖。`--agents` 为这两个 skill 创建共享入口，避免两份安装规则漂移；已有冲突需 `--force`，会先备份再替换。仓库快照不受安装时路径替换影响。

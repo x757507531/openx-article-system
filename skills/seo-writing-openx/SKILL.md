@@ -3,7 +3,7 @@ name: seo-writing-openx
 description: OpenX 站多语言 SEO 文章的端到端产文编排 skill（beta）。串起「选题立项 → 关键词审核 → SERP 与大纲 → 内链设计 → 正文写作 → SEO 元数据 → 格式整理 → 质检 → 回写索引」九个模块，正文委托 human-writing-AYI 写、审核委托 OpenX 文章系统（Obsidian Vault）判，本 skill 只负责编排与交接。触发词：写 OpenX 文章、OpenX SEO 文章、OpenX 产文、给 OpenX 写一篇、/seo-writing-openx。区别于 seo-article-builder（那是 1000X 台湾站的独立一条龙）：本 skill 强制过 OpenX 文章系统的三道闸，做全站关键词防蚕食与内链矩阵管理。
 ---
 
-# OpenX SEO 产文流水线 0.1.0-beta
+# OpenX SEO 产文流水线 0.3.0-beta
 
 这是**编排层**，不是写作层。它自己不定文风、不判关键词，只负责让九个模块按顺序交接、每个交接点的输入输出对得上。
 
@@ -16,7 +16,7 @@ description: OpenX 站多语言 SEO 文章的端到端产文编排 skill（beta�
 读这个文件：
 
 ```
-<VAULT_ROOT>/CLAUDE.md
+<VAULT_ROOT>/AGENTS.md
 ```
 
 下称 **Vault**。它是关键词与内链的唯一规范来源。本 skill 里所有「查 X 表」「跑 Y 脚本」都指 Vault 内的路径。
@@ -92,12 +92,12 @@ cd "<Vault>" && python3 "工具/new_article.py" --lang zh-Hant --title "标题" 
 
 ```bash
 mkdir -p "<Vault>/06-工作区/增益/OX-xxxx"
-# 在 gain.md 里写 3 条，每条一个列表项，每条带 http 开头的一手来源
-python3 ~/.claude/skills/seo-writing-orange/scripts/gate.py gain "<Vault>/06-工作区/增益/OX-xxxx"
+# 按模块契约写至少 1 条增益，附可追溯来源与读者价值
+python3 ~/.claude/skills/seo-writing-orange/scripts/gate.py gain "<Vault>/06-工作区/增益/OX-xxxx" --min-items 1
 ```
 
 一手来源指官方文档 / GitHub / 公告原文；自己实测的写明日志或截图出处。
-「据研究表明」「业内普遍认为」不算。**缺一条或缺一个 URL → exit 1**，三个选择：
+「据研究表明」「业内普遍认为」不算。**未满足至少 1 条可追溯增益 → exit 1**，三个选择：
 回 M1 补研究 ／ 缩题（H1 一起改）／ 明确告诉主人这篇不建议写。**不许凑数硬写。**
 
 #### 大纲
@@ -145,7 +145,7 @@ python3 ~/.claude/skills/human-writing-AYI/scripts/pick_profile.py pick \
 2. 大纲（M3）
 3. 内链清单（M4）—— 位置精确到 H2 + 触发词，让它写的时候就把链接嵌进句子，而不是事后插
 4. 材料清单 —— AYI 版硬要求：至少一个可核对的数字锚点 + 至少一处作者自己撞出来的细节。**材料不够就先补材料，不许用重复解释灌字数。**
-5. **GEO 结构要求** —— 调 `seo-geo-check` 的 brief 入口取得（D1–D5、D7–D13）。
+5. **GEO 结构要求** —— 调 `seo-geo-check` 的 brief 入口取得（D1、D3、D4、D7–D20；D2 已并入 D1、D5 已删除，以 `seo-geo-check/reference/check-items.md` 为准）。
    这些是**结构**要求（开头独立速答块、每节首段先给结论、文末来源逐条可点击），不是文风规则。
    **写前给，比写完再补有效得多**——Answer Block 和「每节先给结论」事后补是硬塞。
    但**把要求做进句子里，不要写成标签**：不许出现「快速解答｜」「先給結論：」这类字样，
@@ -155,7 +155,7 @@ python3 ~/.claude/skills/human-writing-AYI/scripts/pick_profile.py pick \
 本 skill 不复述 AYI 的任何文风规则。档案与 GEO 结构都是**流程编排**，不是文风规则——
 怎么说话仍然归 AYI，本 skill 只负责让它每篇换一套牌、并把结构要求提前交底。
 
-内链一律先写 Obsidian `[[wikilink]]`，URL 规则定了之后在 M7 换真实链接。
+内链在源稿保留 Obsidian `[[wikilink]]`；M7 用 `工具/openx_ops.py export` 按目标同语言已发布 URL 生成副本，规则见模块契约。
 
 **写完先过 D 区审核**（委托 `seo-geo-check`，只审正文；A 区元数据与 E 区 Schema 是 M6 的产出，此刻还不存在）：
 
@@ -212,7 +212,7 @@ python3 ~/.claude/skills/human-writing-AYI/scripts/check_ayi.py <文章路径> \
 
 再走 `article-quality-checker` 做四维诊断。AI 味超标 → 回 M5 让 AYI 改稿，不要自己动手改文风。
 
-**还要回头核对 M3 那 3 条信息增益**：逐条在成稿里找到对应段落，且**来路写进了正文**（读者看得到出处，
+**还要回头核对 M3 的每条信息增益**：逐条在成稿里找到对应段落，且**来路写进了正文**（读者看得到出处，
 不是只有作者知道）。找不到 → 不是文风问题，是这篇少了当初立项的理由：
 要么补写那一段，要么承认差异化没做出来，回 M3 重新想。
 
@@ -269,10 +269,15 @@ cd "<Vault>" && python3 "工具/openx_audit.py" scan
 2. **不许在本 skill 里重写文风规则。** 正文一律走 AYI。
 3. **不许绕过建文件。** M2 过闸后必须建出 idea 文件，否则这篇对系统不存在。
 4. **不许链到不存在的页面。** 目标文章的目标语言版本没有，就删掉那条链接并登记待补。
-5. **待补队列非空 = 上一篇没交付完。** 开新文前先清。
+5. **本篇可执行的待补链接须完成。** 尚未立项、未发布或缺目标语言的依赖保留为待补，写清原因；不得假勾销，也不得因远期选题阻塞全流程。
 
 ## 已知边界（beta）
 
 - `工具/writeback.py` 已实现（幂等 + diff + dry-run），但只覆盖**结构性**回写。内链矩阵的明细行、待补队列勾销、旧文正文插链仍需人工，脚本会逐条列出待办。
-- URL 规则未定，正文内链停留在 `[[wikilink]]` 阶段。规则定了之后 M7 要加一步映射。
-- 存量文章尚未回填 Vault。**在回填完成前，M2 的审核结论不完整**——库里文章少，任何新词都容易显示「无冲突」。
+- 已有发布导出映射工具，依据真实 URL，不猜域名或路由；正式域名、CMS 和上稿方式未提供时，仅交付 ready 源稿及缺口清单。
+- 1000X 迁移路线已于 2026-09-17 取消，不再等待旧站回填；M2 审核范围是 OpenX 实际在库文章，外站素材不冒充本站存量。
+
+## 系统维护与版本日志
+
+本仓库 `skills/` 是发行源；安装可用 `--agents` 为代理创建共享入口，不另复制规则。
+修改规则、脚本或流程后，必须遵循 Vault `工具/系统维护.md`，并在 Vault 根目录 `版本更新日志.md` 追加版本、原因、改动、验证、未完成依赖和回滚记录。无日志不得宣称更新完成。

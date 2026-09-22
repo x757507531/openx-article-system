@@ -42,9 +42,8 @@ def resolve_vault(vault: str, article_path: str | None = None) -> str:
                 return d
             d = os.path.dirname(d)
     return vault
-GATE_PY = os.path.expanduser(
-    "~/.claude/skills/seo-writing-orange/scripts/gate.py"
-)
+GATE_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+                       "seo-writing-orange", "scripts", "gate.py")
 
 def kw_in(kw: str, text: str) -> bool:
     """主词匹配不分大小写（2026-09-18：frontmatter 写 smc 策略、标题写 SMC 策略曾被判未命中）。"""
@@ -60,7 +59,12 @@ TITLE_MAX_WIDTH = 30.0
 DESC_MAX_CHARS = 155
 ABSTRACT_RANGE = (90, 140)
 TAG_RANGE = (6, 10)
-MIN_VERIFIABLE_FACTS = 10
+# D1 Answer Block：六型字数并集（定义型 60–120、Yes/No 型 50–100、比较型 80–160、
+# 方法／风险型 100–180、时效型 60–120）。分型定义见 seo-geo-check/reference/check-items.md
+# （唯一事实来源），这里只放机检阈值；audit_d.py 复用本常量，不另抄一份。
+ANSWER_BLOCK_RANGE = (50, 180)
+# D1：出现这些时效词就必须同时标出日期，否则旧来源会造成旧答案
+TIMELY_WORDS = ("目前", "現在", "现在", "最新", "截至", "當前", "当前", "如今", "今年", "至今")
 
 # D8 二手转述黑名单：这类措辞等于没有来源
 VAGUE_ATTRIBUTION = (
@@ -486,38 +490,45 @@ def check_d(r: Report, fm: dict, main: str, vault: str, article_id: str) -> None
     r.section("D · GEO 要素（被 AI 引用的条件）")
     primary = fm.get("primary_keyword", "") or ""
 
-    # D1 / D2 Answer Block
+    # D1 Answer Block。D2 内链禁区已并入 D1（2026-09-03）；分型口径（字数并集、时效词标日期）
+    # 2026-09-19 与 audit_d.py 统一到这里。「属哪一型、缺了该型哪几段」是语义判断，由 seo-geo-check 评审判。
     blocks = blocks_after_h1(main)
     ablock = blocks[0] if blocks else ""
     is_quote = ablock.startswith(">")
     if not is_quote:
         r.add("FAIL", "D1", "H1 之后第一个块不是独立引用块",
               [f"实际首块: {ablock[:60]}…" if ablock else "H1 之后没有内容"])
-        r.add("SKIP", "D2", "无 Answer Block，跳过内链禁区检查", [])
     else:
         qlines = [re.sub(r"^>\s?", "", l) for l in ablock.splitlines()]
         content = [l for l in qlines if l.strip() and not re.fullmatch(r"\*\*.+\*\*", l.strip())]
         caption = [l for l in qlines if re.fullmatch(r"\*\*.+\*\*", l.strip())]
+        body_txt = " ".join(content)
+        n = han_count(body_txt)
+        lo, hi = ANSWER_BLOCK_RANGE
         has_kw = any(kw_in(primary, l) for l in qlines)
+        links = re.findall(r"\[\[[^\]]+\]\]|\[[^\]]+\]\([^)]+\)", ablock)
+        timely = [w for w in TIMELY_WORDS if w in body_txt]
+        has_date = bool(re.search(r"\d{4}\s*年|\d{4}-\d{2}|\d{4}/\d{1,2}", body_txt))
         detail = [
             f"caption 行: {caption[0][:40] if caption else '（无）'}",
-            f"内容段数: {len(content)}（要求 1 段讲完）",
-            f"字数: {han_count(' '.join(content))} 中文字",
+            f"字数: {n} 中文字 / 六型并集 {lo}–{hi}",
             f"主词{'命中' if has_kw else '未出现'}",
+            f"块内链接: {len(links)} 个（内链禁区）",
+            f"时效词: {'、'.join(timely) if timely else '无'}；日期: {'有' if has_date else '无'}",
         ]
-        if len(content) > 1:
-            r.add("WARN", "D1", f"Answer Block 有 {len(content)} 段，建议压成一段", detail)
+        if links:
+            r.add("FAIL", "D1", f"Answer Block 内有 {len(links)} 个链接（内链禁区）",
+                  detail + [f"命中: {l[:40]}" for l in links[:3]])
+        elif not (lo <= n <= hi):
+            r.add("FAIL", "D1", f"Answer Block 字数 {n} 超出 {lo}–{hi}",
+                  detail + ["定义型 60–120、Yes/No 型 50–100、比较型 80–160、方法与风险型 100–180、时效型 60–120，见 check-items.md 分型表"])
+        elif timely and not has_date:
+            r.add("FAIL", "D1", "Answer Block 用了时效词却没标日期",
+                  detail + ["时效型不标日期最危险——旧来源会造成旧答案"])
         elif not has_kw:
             r.add("WARN", "D1", "Answer Block 不含主关键词", detail)
         else:
-            r.add("PASS", "D1", "Answer Block 为独立引用块、一段讲完", detail)
-
-        links = re.findall(r"\[\[[^\]]+\]\]|\[[^\]]+\]\([^)]+\)", ablock)
-        if links:
-            r.add("FAIL", "D2", f"Answer Block 内有 {len(links)} 个链接（内链禁区）",
-                  [f"命中: {l[:40]}" for l in links[:3]])
-        else:
-            r.add("PASS", "D2", "Answer Block 内无链接", [])
+            r.add("PASS", "D1", f"Answer Block 为独立引用块、无链接、字数与时效标注合规（{n} 字）", detail)
 
     # D3 每个 H2 首段即结论 → 人工，脚本给素材（FAQ 节不算内容 H2）
     secs = section_bodies(main)
@@ -554,20 +565,7 @@ def check_d(r: Report, fm: dict, main: str, vault: str, article_id: str) -> None
         else:
             r.add("PASS", "D4", f"FAQ {len(qs)} 题一问一答、答案自包含", detail)
 
-    # D5 可查证数字与日期
-    facts = set()
-    for m in re.finditer(r"(?<![\w-])(?:\d{4}\s*年(?:\s*\d{1,2}\s*月)?(?:\s*\d{1,2}\s*日)?"
-                         r"|\d+(?:,\d{3})+(?:\.\d+)?"
-                         r"|\d+(?:\.\d+)?\s*(?:%|％|億|亿|萬|万|秒|分鐘|分钟|小時|小时|天|倍|次|個|个|筆|笔|美元|元)"
-                         r"|\\?\$\s*\d+(?:\.\d+)?"
-                         r"|V\d+(?:\.\d+)?)", main):
-        facts.add(m.group(0).strip())
-    detail = [f"去重计数: {len(facts)} / 要求 ≥{MIN_VERIFIABLE_FACTS}",
-              f"抽样: {'、'.join(sorted(facts)[:10])}"]
-    if len(facts) >= MIN_VERIFIABLE_FACTS:
-        r.add("PASS", "D5", f"可查证数字与日期 {len(facts)} 处", detail)
-    else:
-        r.add("FAIL", "D5", f"可查证数字与日期只有 {len(facts)} 处", detail)
+    # D5 可查证数字与日期：已删除（2026-09-03）。阈值无依据，且能靠无关数字凑满，拦不住真问题。
 
     # D6 信息增益（委托 gate.py，不重写逻辑）
     gain_dir = os.path.join(vault, "06-工作区", "增益", article_id) if article_id else ""
@@ -577,10 +575,10 @@ def check_d(r: Report, fm: dict, main: str, vault: str, article_id: str) -> None
     elif not os.path.isfile(gain_md):
         r.add("FAIL", "D6", "找不到 gain.md（M3 闸 1.5 未过）",
               [f"应在: 06-工作区/增益/{article_id}/gain.md",
-               "写 3 条「SERP 前 10 都没有的东西」，每条带一手来源 URL"])
+               "至少写 1 条「SERP 前 10 都没有的东西」，带一手来源 URL 与读者价值"])
     else:
         try:
-            p = subprocess.run([sys.executable, GATE_PY, "gain", gain_dir],
+            p = subprocess.run([sys.executable, GATE_PY, "gain", gain_dir, "--min-items", "1"],
                                capture_output=True, text=True, timeout=30)
             head = [l for l in p.stdout.splitlines() if l.strip()][:4]
             if p.returncode == 0:
@@ -594,7 +592,9 @@ def check_d(r: Report, fm: dict, main: str, vault: str, article_id: str) -> None
     # 匹配不上不硬判 FAIL——文本比对本身不可靠（同一件事可以换句话说），
     # 转成人工书面确认，避免误报把流水线堵死。
     if os.path.isfile(gain_md):
-        items = [l.strip() for l in open(gain_md, encoding="utf-8").read().splitlines()
+        with open(gain_md, encoding="utf-8") as gain_file:
+            gain_lines = gain_file.read().splitlines()
+        items = [l.strip() for l in gain_lines
                  if re.match(r"^\s*(\d+[.、)]|[-*])\s*\S", l) and han_count(l) >= 8]
         n = 6
         hay = zh_norm(main)
@@ -694,9 +694,11 @@ def check_e(r: Report, main: str, fields: dict, url: str) -> int:
     r.section("E · 结构化数据")
     label, val = seo_get(fields, "Schema", "建議Schema")
     line = val.replace("\n", " ")
-    missing = [w for w in REQUIRED_SCHEMA if w not in line]
-    entity = [w for w in ENTITY_SCHEMA if w in line]
-    optional = [w for w in OPTIONAL_SCHEMA if w in line]
+    types = set(re.findall(r"\b(?:Article|BlogPosting|BreadcrumbList|Organization|Person|WebSite|FAQPage)\b", line))
+    missing = [w for w in REQUIRED_SCHEMA if w not in types
+               and not (w == "Article" and "BlogPosting" in types)]
+    entity = [w for w in ENTITY_SCHEMA if w in types]
+    optional = [w for w in OPTIONAL_SCHEMA if w in types]
     detail = [
         f"值: {line[:80] or '（无）'}",
         "必备: " + "、".join(f"{w}{'✓' if w not in missing else '✗'}" for w in REQUIRED_SCHEMA),
@@ -714,21 +716,24 @@ def check_e(r: Report, main: str, fields: dict, url: str) -> int:
         r.add("PASS", "E1", f"Schema 合规（必备 2 类 + 实体 {len(entity)} 类）",
               detail + ["FAQPage 已降为可选：问答展示位已从搜索结果移除，且无证据提升 AI 引用"])
 
+    # E2 已并入 E1（2026-09-03）：FAQPage 可选；只有声明了 FAQPage 才核「标记须与可见内容一致」
     faq = next((b for h, b in section_bodies(main) if re.search(r"常見問題|常见问题|FAQ", h)), "")
     actual = len(re.findall(r"^\*\*Q\d*[：:.]?\s*.+?\*\*\s*$", faq, re.M))
-    declared = None
-    m = re.search(r"([0-9]+|[一二三四五六七八九十]+)\s*[題题]", line)
-    if m:
-        tok = m.group(1)
-        declared = int(tok) if tok.isdigit() else CN_NUM.get(tok)
-    detail = [f"正文 FAQ 题数: {actual}",
-              f"Schema 行声明: {declared if declared is not None else '未声明题数'}"]
-    if declared is None:
-        r.add("WARN", "E2", f"Schema 行未声明题数，正文有 {actual} 题", detail)
-    elif declared == actual:
-        r.add("PASS", "E2", f"FAQPage 与正文一致（{actual} 题）", detail)
-    else:
-        r.add("FAIL", "E2", f"题数不一致：正文 {actual}，声明 {declared}", detail)
+    if optional:
+        declared = None
+        m = re.search(r"([0-9]+|[一二三四五六七八九十]+)\s*[題题]", line)
+        if m:
+            tok = m.group(1)
+            declared = int(tok) if tok.isdigit() else CN_NUM.get(tok)
+        detail = [f"正文 FAQ 题数: {actual}",
+                  f"Schema 行声明: {declared if declared is not None else '未声明题数'}",
+                  "FAQPage 是可选项；保留就必须与可见内容一致（原 E2，已并入 E1）"]
+        if declared is None:
+            r.add("WARN", "E1", f"声明了 FAQPage 但未写题数，正文有 {actual} 题", detail)
+        elif declared != actual:
+            r.add("FAIL", "E1", f"FAQPage 题数不一致：正文 {actual}，声明 {declared}", detail)
+        else:
+            r.add("PASS", "E1", f"FAQPage 与正文一致（{actual} 题）", detail)
 
     # E3 / E4 需要已发布页面，交给在线检查；未发布就挂着，发布后回来跑
     if not url:

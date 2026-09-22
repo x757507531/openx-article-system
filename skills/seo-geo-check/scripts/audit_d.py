@@ -10,8 +10,10 @@
 设计约束（改代码前先读，这几条是这个脚本存在的理由）：
 
   1. **不复制 check_geo.py 的逻辑，用 importlib 加载它复用。** D 区机检那部分
-     它已经实现了，抄一份必然漂移。本脚本只新增 D13、评审任务与回验。
-  2. **不修改 check_geo.py。** 一行都不改。
+     它已经实现了，抄一份必然漂移。本脚本只新增 D13–D20 等扩展项、评审任务与回验。
+  2. **改 check_geo.py 必须同步 check-items.md**（seo-geo-check SKILL.md 红线 5），且本脚本不复制它的逻辑。
+     D1 的机检（引用块结构、内链禁区、六型字数并集、时效词标日期）2026-09-19 已统一下沉到
+     check_geo.py 的 check_d；本脚本对 D1 只做一件事——Answer Block 存在就送评审判「属哪型、缺哪段」。
   3. **回验是硬判定。** 证据核不上 → 判定作废，不是警告。字面比对不可靠的地方
      （D7）走「机检未命中转评审」，不硬判失败。
   4. **本脚本只判 D 区。** A/E/J 归 M6 的 check_geo.py。D6 归 M3 闸 1.5，这里只引用不重判。
@@ -26,9 +28,8 @@ import os
 import re
 import sys
 
-CHECK_GEO = os.path.expanduser(
-    "~/.claude/skills/seo-writing-openx/scripts/check_geo.py"
-)
+CHECK_GEO = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))),
+                         "seo-writing-openx", "scripts", "check_geo.py")
 
 # 固定要评审的语义项 / 机检未命中才转评审的项
 REVIEW_ITEMS = ("D3", "D8", "D10")
@@ -73,11 +74,11 @@ REVIEW_QUESTIONS = {
            "对确实给了反面的主张，交出那句反方原文。",
     "D15": "判断 CTA 是否抢在主要答案之前、YMYL 主题是否用了风险恐吓或强迫式推销"
            "（不要回答「CTA 是否恰当」）。交出那句 CTA 原文作为证据；若全文无 CTA 写明无。",
-    "D4": "指出**哪几题 FAQ 在正文里找不到回答它的段落、或答案加了正文没有的主张**（不要回答「是否都有对应」）。",
+    "D4": "指出**哪几题 FAQ 在正文里找不到回答它的段落、或答案加了正文没有的主张**（不要回答「是否都有对应」）。"
+          "FAQ 是正文关键答案的独立摘要。对每题用 / 分隔交出两条证据：「FAQ 答案原句 / 正文对应原句」。",
     "D18": "指出**哪几处绝对化或排他性表述（沒有一篇／全部／一定／不存在／不成立…）没有对应证据、或结论范围超出了它引用的来源**（不要回答「表述是否都有证据」）。",
     "D19": "对正文里的案例，指出**缺了哪几项：判定规则是否写在标注之前；确认条件、失效条件、放弃条件是否各自写明；标注有没有用到当时还不可知的信息（事后信息）；正文承诺的范围与案例实际示范的范围是否一致**（不要回答「案例是否完整」）。"
-          "FAQ 只该补正文没答的延伸问题；重复正文关键答案的题要挑出来。"
-          "对每个指认，用 / 分隔交出两条证据：「FAQ 里那句答案」与「正文中对应的原句」。",
+           "对每个指认交出案例原句，并说明其时点能获得的证据。",
     "D8": "挑出**哪些重要主张附近没有来源**（不要回答「是否都有」）。"
           "**不要按外链数量判断——数量不是标准**，官方明确反对每篇机械插 n 个链接。"
           "看的是需要外部证明的主张，在该主张附近能不能就地核实。"
@@ -147,10 +148,7 @@ def check_d13(cg, r, main: str) -> None:
 
 
 FAQ_OVERLAP_MIN = 0.10   # 2026-09-18 反转：FAQ 从正文提取，答案与正文重合率低于此值才可疑
-# D1：六型 Answer Block 的字数并集（定义型 60–120 … 方法/风险型 100–180）
-ANSWER_BLOCK_RANGE = (50, 180)
-# D1：出现这些时效词就必须同时标出日期，否则旧来源会造成旧答案
-TIMELY_WORDS = ("目前", "現在", "现在", "最新", "截至", "當前", "当前", "如今", "今年", "至今")
+# D1 的阈值（ANSWER_BLOCK_RANGE / TIMELY_WORDS）在 check_geo.py 顶部，这里不另抄一份。
 # D8：只有含量化主张或绝对化断言的段落才算「需要外部证明」，
 # 否则任何带数字的段落都进候选，评审方要在噪音里找真问题
 CLAIM_SIGNALS = (
@@ -192,30 +190,11 @@ CTA_WORDS = ("立即註冊", "立即注册", "馬上註冊", "马上注册", "�
              "加入我们", "立即下載", "立即下载", "趕快", "赶快", "不要錯過", "不要错过")
 
 
-def check_d1_typed(cg, r, main: str) -> None:
-    """D1 的分型部分：字数落在六型并集内 + 时效词必须带日期。
-    「属哪一型、缺了该型哪几段」是语义判断，交评审。"""
+def d1_needs_review(cg, main: str) -> bool:
+    """D1 的机检（引用块结构、内链禁区、六型字数并集、时效词标日期）已在 check_geo.py 的 check_d 里，
+    这里不重判。「属哪一型、缺了该型哪几段」是语义判断——只要 Answer Block 存在就送评审。"""
     blocks = cg.blocks_after_h1(main)
-    ab = blocks[0] if blocks else ""
-    if not ab.startswith(">"):
-        r.add("SKIP", "D1", "没有 Answer Block，分型检查跳过", [])
-        return
-    lines = [re.sub(r"^>\s?", "", l) for l in ab.splitlines()]
-    body = " ".join(l for l in lines if l.strip() and not re.fullmatch(r"\*\*.+\*\*", l.strip()))
-    n = cg.han_count(body)
-    lo, hi = ANSWER_BLOCK_RANGE
-    timely = [w for w in TIMELY_WORDS if w in body]
-    has_date = bool(re.search(r"\d{4}\s*年|\d{4}-\d{2}|\d{4}/\d{1,2}", body))
-    detail = [f"字数 {n} 中文字 / 六型并集 {lo}–{hi}",
-              f"时效词: {'、'.join(timely) if timely else '无'}；日期: {'有' if has_date else '无'}"]
-    if not (lo <= n <= hi):
-        r.add("FAIL", "D1", f"Answer Block 字数 {n} 超出 {lo}–{hi}",
-              detail + ["定义型 60–120、Yes/No 型 50–100、方法与风险型 100–180，见分型表"])
-    elif timely and not has_date:
-        r.add("FAIL", "D1", "用了时效词却没标日期",
-              detail + ["时效型 Answer Block 不标日期最危险——旧来源会造成旧答案"])
-    else:
-        r.add("PASS", "D1", f"字数与时效标注合规（{n} 字）", detail)
+    return bool(blocks) and blocks[0].startswith(">")
 
 
 def check_d8_proximity(cg, r, main: str) -> None:
@@ -697,7 +676,6 @@ def stage_scan(cg, path: str, vault: str) -> int:
         rows.append((verdict, item, summary, detail))
     # 本模组新增的检查单独收集，再决定哪些需要语义确认
     extra = cg.Report()
-    check_d1_typed(cg, extra, main)
     check_d4_faq_gap(cg, extra, main)
     check_d8_proximity(cg, extra, main)
     check_d12_restraint(cg, extra, main)
@@ -715,11 +693,12 @@ def stage_scan(cg, path: str, vault: str) -> int:
     check_d19_case(cg, extra, main)
     check_d20_case_data(cg, extra, main, vault, aid)
 
-    # 机检结论不等于语义结论：这几项要么本来就要评审判（D1 的分型），
-    # 要么机检只能粗筛（D4 的字面重合、D15 的恐吓式推销），一律送评审。
+    # 机检结论不等于语义结论：D1 的「属哪型、缺哪段」本来就要评审判（机检部分在 check_d 里已跑过），
+    # D4 / D15 等机检只能粗筛（字面重合、恐吓式推销），一律送评审。
+    if d1_needs_review(cg, main) and "D1" not in to_review:
+        to_review.append("D1")
     for verdict, item, _, _ in extra.rows:
-        need = ((item == "D1" and verdict != "SKIP")
-                or (item == "D4" and verdict in ("WARN", "FAIL"))
+        need = ((item == "D4" and verdict in ("WARN", "FAIL"))
                 or (item == "D15" and verdict != "SKIP")
                 or (item == "D16" and verdict in ("WARN", "FAIL"))
                 or (item == "D18" and verdict in ("WARN", "FAIL"))
@@ -960,7 +939,7 @@ def stage_verify(cg, path: str, vault: str) -> int:
 def main() -> int:
     args = sys.argv[1:]
     cg = load_check_geo()
-    vault = cg.resolve_vault(cg.VAULT, args[0]) if hasattr(cg, 'resolve_vault') else cg.VAULT
+    vault = cg.resolve_vault(cg.VAULT, args[0] if args else None)
     if "--vault" in args:
         i = args.index("--vault")
         try:
