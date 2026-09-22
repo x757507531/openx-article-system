@@ -558,6 +558,20 @@ def cmd_scan(args):
         print("    %s  已有 %d/%d  缺：%s"
               % (aid, len(have), len(LANGS), ", ".join(miss) if miss else "无"))
 
+    # 已完成矩阵行必须有正文链接；工作区、代码示例不能充当落地证据。
+    from openx_ops import link_issues
+    print("\n[8] 内链矩阵完成记录与正文一致性")
+    matrix_path = os.path.join(INDEX_DIR, "内链矩阵.md")
+    try:
+        with open(matrix_path, encoding="utf-8") as handle:
+            actual_issues = link_issues(load_articles(), handle.read(), args.lang)
+    except OSError as exc:
+        actual_issues = ["无法读取内链矩阵：%s" % exc]
+    for issue in actual_issues:
+        print("    " + issue)
+    print("    %s" % ("通过" if not actual_issues else "%d 项" % len(actual_issues)))
+    problems += len(actual_issues)
+
     print("\n" + "=" * 64)
     print("体检完成：%d 项待处理。" % problems)
     print("L1 冲突 → 关键词登记表「待仲裁冲突」；待补内链 → 内链矩阵「待补链接队列」。")

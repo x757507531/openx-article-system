@@ -240,3 +240,11 @@ python3 "工具/writeback.py" --article OX-xxxx --lang zh-Hant --status publishe
 文件丢进 `06-工作区/待导入/` → 提取 frontmatter → 分配 `article_id` → 写入索引表 → 跑一次全量冲突扫描（`python3 "工具/openx_audit.py" scan`）清理历史蚕食。
 
 **在存量回填完成之前，闸 1 的审核结论是不完整的**，写新文时要意识到这一点。
+
+## 8. 系统维护与交付（0.3.0-beta）
+
+- 发布副本：`python3 工具/openx_ops.py export --article OX-xxxx --lang zh-Hant --output <新文件>`，按真实 URL 映射，不修改源稿、不执行上线。
+- 完成链接实检：`python3 工具/openx_ops.py links`，已接入 `scan` 第 8 项；本篇可执行项须落实，未立项/未发布/缺语言的依赖保留原因，不假勾销或阻塞无关文章。
+- 未上线保持 ready；published 必须有真实 URL 与有效发布日期，回写格式检查不代表页面已经上线。
+- 每次系统优化须同步模块契约并追加 `版本更新日志.md`，记录改动、验证与未完成条件；读 `工具/系统维护.md`。
+- `skills/` 为版本控制中的发行源；`install.sh --agents` 可让代理入口指向同一份已安装技能，防止副本漂移。
